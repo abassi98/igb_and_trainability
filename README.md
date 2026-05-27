@@ -275,17 +275,11 @@ If you use this repository, please cite:
 
 ```bibtex
 @inproceedings{
-  bassi2026when,
-  title={When Bias Meets Trainability: Connecting Theories of Initialization},
-  author={
-    Alberto Bassi and
-    Marco Baity-Jesi and
-    Aurelien Lucchi and
-    Carlo Albert and
-    Emanuele Francazi
-  },
-  booktitle={The Thirteenth International Conference on Learning Representations},
-  year={2026},
-  url={https://openreview.net/forum?id=75ce9hnKne}
+bassi2026when,
+title={When Bias Meets Trainability: Connecting Theories of Initialization},
+author={Alberto Bassi and Marco Baity-Jesi and Aurelien Lucchi and Carlo Albert and Emanuele Francazi},
+booktitle={The Fourteenth International Conference on Learning Representations},
+year={2026},
+url={https://openreview.net/forum?id=75ce9hnKne}
 }
 ```
