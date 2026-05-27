@@ -1,5 +1,4 @@
-# igb_and_trainability
-# IGB and Trainability
+# Initial Guessing Bias and Trainability
 
 ### Official implementation for the ICLR 2026 paper
 
@@ -175,9 +174,9 @@ This generates quantities used to study phase transitions and trainability.
 
 ---
 
-## 3. Depth-Induced Prejudice (DIP)
+## 3. Deep information propagation (DIP)
 
-Recursive theoretical experiments.
+Reproduce standard mean-field results, in particular from "Deep information propagation" (arXiv:1611.01232) by Schoenholz et al. 
 
 ```bash
 mpirun -np 20 python main_dip.py \
