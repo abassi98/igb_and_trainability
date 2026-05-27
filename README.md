@@ -269,43 +269,6 @@ Then include:
 
 ---
 
-# Typical Workflow
-
-Example end-to-end reproduction:
-
-```bash
-# initialize environment
-conda activate igb_trainability
-
-# run initialization scans
-mpirun -np 20 python main_init.py ...
-
-# compute forward statistics
-mpirun -np 20 python main_forward.py ...
-
-# run training
-python main_train.py train \
-    --spec_file train_spec_mlp_bfmnist/...
-
-# generate plots
-python plot/plot_train_main.py
-```
-
----
-
-# Hardware Notes
-
-Experiments in the paper were run across multiple processes and can benefit substantially from:
-
-- multi-core CPUs;
-- MPI execution;
-- GPU acceleration for training;
-- sufficient storage for generated statistics.
-
-Smaller settings can be used for quick validation runs.
-
----
-
 # Citation
 
 If you use this repository, please cite:
@@ -326,15 +289,3 @@ If you use this repository, please cite:
   url={https://openreview.net/forum?id=75ce9hnKne}
 }
 ```
-
----
-
-# License
-
-This repository is released under the MIT License.
-
----
-
-# Acknowledgements
-
-This repository accompanies the ICLR 2026 publication and is intended to support reproducible research.
