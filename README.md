@@ -30,6 +30,14 @@ If you use this repository, please cite the paper (BibTeX below).
 
 ---
 
+# Poster
+
+<p align="center">
+  <img src="poster_igb_trainability.png" width="950">
+</p>
+
+---
+
 # Repository structure
 
 ```text
@@ -241,33 +249,6 @@ Plots are saved locally by the scripts.
 
 ---
 
-# Main Figures
-
-## Figure 3 (Main paper)
-
-Place the exported Figure 3 into:
-
-```text
-assets/fig3.png
-```
-
-Then include:
-
-```html
-<p align="center">
-  <img src="assets/fig3.png" width="950">
-</p>
-```
-
----
-
-## Main training figure
-
-<p align="center">
-  <img src="main_train.png" width="950">
-</p>
-
----
 
 # Citation
 
