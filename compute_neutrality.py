@@ -1,13 +1,19 @@
+"""
+Compute the neutrality curve for a given activation function and two-point activation function, by iterating the variance and covariance equations until convergence. 
+The neutrality curve is defined as the value of Vw for which the correlation c becomes lower than 0.5 (at eoc, c=1 by definition). 
+Each process computes the neutrality curve for a chunk of Vb values, and sends the results to rank 0, which saves the complete neutrality curve in a csv file.
+"""
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 import autograd.numpy as np
-from scipy.integrate import quad, dblquad, nquad
-from autograd import grad
+from scipy.integrate import quad, dblquad
 import src.utils as ut
-from scipy.special import erf
 import pandas as pd
 import argparse
 from mpi4py import MPI
+from tqdm import tqdm
 
 dtype = np.float32
 
@@ -27,12 +33,6 @@ def update_variance_2nodes(q, Vw, Vb, act_func, act_func2):
     f = lambda z1, z2  : 1/(2*np.pi)*np.exp(-z1**2/2-z2**2/2)*act_func2(act_func(np.sqrt(q)*z1), act_func(np.sqrt(q)*z2))**2
     I, err = dblquad(f, -np.inf, np.inf, -np.inf, np.inf)
     return Vw*I + Vb
-
-# def update_covariance_2nodes(c, q, Vw, Vb, act_func, act_func2):
-#     f = lambda z1, z2, z1p, z2p : 1/(2*np.pi)**2*np.exp(-z1**2/2-z2**2/2-z1p**2/2-z2p**2/2)*act_func2(act_func(np.sqrt(q)*z1), act_func(np.sqrt(q)*z2))*act_func2(act_func(np.sqrt(q)*(c*z1+np.sqrt(1-c**2)*z1p)), act_func(np.sqrt(q)*(c*z2+np.sqrt(1-c**2)*z2p)))
-#     ranges = [[-np.inf, np.inf]]*4
-#     I, err = nquad(f, ranges)
-#     return Vw*I + Vb
 
 def update_covariance_2nodes(c, q, Vw, Vb, act_func, act_func2, N=100000):
     # Sample from standard normal
@@ -91,7 +91,6 @@ def get_args():
     parser.add_argument('--act_func2', type=str, default="Linear", choices=["Linear", "MaxPool", "AveragePool"], help="Two point activation function.")
     parser.add_argument('--Vw_max', type=float, default=4.0)
     parser.add_argument('--dVw', type=float, default=0.1)
-    parser.add_argument('--n_proc', type=int, default=1, help="Number of processes")
     parser.add_argument('--n_iter', type=int, default=100, help="Max number of recursive iteration")
 
     cfg = vars(parser.parse_args())
@@ -106,6 +105,7 @@ def process(Vb_vec, eoc_vec, Vw_max, dVw, n_iter, act_func_, act_func2_):
 
     ii = 0
     neutral = eoc_vec[0] # for sure neutral is above eoc, assuming eoc increasing
+    pbar = tqdm(total=len(Vb_vec), desc=f"Computing neutrality for {act_func_}+{act_func2_}")
     for Vb in Vb_vec:
         q=1.0
         cov = 0.01
@@ -134,7 +134,7 @@ def process(Vb_vec, eoc_vec, Vw_max, dVw, n_iter, act_func_, act_func2_):
                 break
             
             neutral += dVw # increase neutral
-        
+        pbar.update(1)
         buf[ii] = neutral
         ii += 1
     
@@ -150,24 +150,23 @@ cfg = get_args()
 act_func = cfg["act_func"]
 act_func2 = cfg["act_func2"]
 Vw_max, dVw = cfg["Vw_max"], cfg["dVw"]
-n_proc, n_iter = cfg["n_proc"],  cfg["n_iter"]
+n_iter = cfg["n_iter"]
 
-if act_func2=="Linear":
-    eoc_vec = np.array(pd.read_csv(f"data/eoc_{act_func}.csv", index_col=0).loc[:,"eoc"])
-    Vb_vec = np.array(pd.read_csv(f"data/eoc_{act_func}.csv", index_col=0).loc[:,"Vb"])
-else:
-    eoc_vec = np.array(pd.read_csv(f"data/eoc_{act_func}+{act_func2}.csv", index_col=0).loc[:,"eoc"])
-    Vb_vec = np.array(pd.read_csv(f"data/eoc_{act_func}+{act_func2}.csv", index_col=0).loc[:,"Vb"])
+
+# Retrieve EOC
+eoc_vec = np.array(pd.read_csv(f"data/eoc_{act_func}+{act_func2}.csv", index_col=0).loc[:,"eoc"])
+Vb_vec = np.array(pd.read_csv(f"data/eoc_{act_func}+{act_func2}.csv", index_col=0).loc[:,"Vb"])
 
 Vb_points = len(Vb_vec)
 
-assert Vb_points % n_proc == 0 # equal number of points for each process
-Vb_points_proc = Vb_points // n_proc
+assert Vb_points % my_size == 0 # equal number of points for each process
+Vb_points_proc = Vb_points // my_size
 
 # compute for every rank
 Vb_vec_proc = Vb_vec[my_rank*Vb_points_proc:(my_rank+1)*Vb_points_proc]
-Vb_min_proc, Vb_max_proc = np.min(Vb_vec_proc), np.max(Vb_vec_proc)
-print(f"Hello from rank {my_rank} on {MPI.Get_processor_name()}. I am computing chunk from Vb={Vb_min_proc} to Vb={Vb_max_proc}")
+Vb_mimy_size, Vb_max_proc = np.min(Vb_vec_proc), np.max(Vb_vec_proc)
+
+print(f"Hello from rank {my_rank} on {MPI.Get_processor_name()}. I am computing chunk from Vb={Vb_mimy_size} to Vb={Vb_max_proc}")
 eoc_vec_proc = eoc_vec[my_rank*Vb_points_proc:(my_rank+1)*Vb_points_proc]
 buf = process(Vb_vec_proc, eoc_vec_proc, Vw_max, dVw, n_iter, act_func, act_func2)
 
@@ -176,7 +175,7 @@ if my_rank==0: # rank 0 save
     save_buf[0:Vb_points_proc] = buf # save zeroth buffer data
 
     # save receive other buffers
-    for sub_rank in range(1,n_proc):
+    for sub_rank in range(1,my_size):
         rcv_buf = np.zeros_like(Vb_vec_proc, dtype=dtype)
         comm.Recv([rcv_buf, Vb_points_proc, MPI.FLOAT], source=sub_rank, tag=sub_rank) 
         save_buf[sub_rank*Vb_points_proc:(sub_rank+1)*Vb_points_proc] = rcv_buf
@@ -185,10 +184,7 @@ if my_rank==0: # rank 0 save
     df = pd.DataFrame(data={"Vb":Vb_vec, "neutrality":save_buf})
     
     # save data
-    if act_func2=="Linear":
-        df.to_csv(f"data/neutrality_{act_func}.csv")
-    else:
-        df.to_csv(f"data/neutrality_{act_func}+{act_func2}.csv")
+    df.to_csv(f"data/neutrality_{act_func}+{act_func2}.csv")
 
 elif my_rank > 0:
     # send results to 0
