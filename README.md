@@ -53,7 +53,6 @@ igb_and_trainability/
 ├── train_spec_vit_cifar10/
 │
 ├── main_init.py
-├── main_forward.py
 ├── main_dip.py
 ├── main_train.py
 ├── compute_eoc.py
@@ -74,30 +73,11 @@ git clone https://github.com/abassi98/igb_and_trainability.git
 cd igb_and_trainability
 ```
 
-Create a Python environment:
+Create the Python environment from .yml file:
 
 ```bash
-conda create -n igb_trainability python=3.10
+conda create --file environment.yml
 conda activate igb_trainability
-```
-
-Install dependencies:
-
-```bash
-pip install \
-torch \
-torchvision \
-lightning \
-pytorch-lightning \
-datasets \
-mpi4py \
-numpy \
-scipy \
-pandas \
-matplotlib \
-h5py \
-tqdm \
-cmcrameri
 ```
 
 If using MPI execution:
@@ -132,15 +112,15 @@ Single process:
 python main_init.py \
     --model MLP \
     --data bfmnist \
-    --max_depth 100 \
-    --width 1000 \
+    --max_depth 10 \
+    --width 100 \
     --act_func ReLU \
     --Vw_min 0.1 \
     --Vw_max 2.0 \
     --Vb_min 0.0 \
     --Vb_max 0.2 \
-    --n_w 20 \
-    --n_b 10
+    --n_w 10 \
+    --n_b 3
 ```
 
 Distributed execution:
@@ -149,42 +129,21 @@ Distributed execution:
 mpirun -np 20 python main_init.py \
     --model MLP \
     --data bfmnist \
-    --max_depth 100 \
-    --width 1000 \
+    --max_depth 10 \
+    --width 100 \
     --act_func ReLU \
-    --n_w 20 \
-    --n_b 10
+    --n_w 10 \
+    --n_b 3
 ```
 
 This stage generates initialization statistics used in subsequent analysis.
 
 ---
 
-## 2. Forward dynamics simulations
 
-Forward propagation statistics over random ensembles.
+## 2. Deep information propagation (DIP)
 
-```bash
-mpirun -np 20 python main_forward.py \
-    --max_depth 100 \
-    --width 1000 \
-    --act_func ReLU \
-    --Vw_min 1.0 \
-    --Vw_max 3.0 \
-    --Vb_min 0.0 \
-    --Vb_max 0.2 \
-    --n_w 20 \
-    --n_b 1 \
-    --n_net_samples 10
-```
-
-This generates quantities used to study phase transitions and trainability.
-
----
-
-## 3. Deep information propagation (DIP)
-
-Reproduce standard mean-field results, in particular from "Deep information propagation" (arXiv:1611.01232) by Schoenholz et al. 
+Reproduce standard mean-field results, in particular from "Deep information propagation" (arXiv:1611.01232) by Schoenholz et al., 2016. 
 
 ```bash
 mpirun -np 20 python main_dip.py \
@@ -201,7 +160,7 @@ mpirun -np 20 python main_dip.py \
 
 ---
 
-## 4. Supervised training experiments
+## 3. Supervised training experiments
 
 Training runs are controlled via configuration files.
 
