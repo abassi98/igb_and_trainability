@@ -23,9 +23,8 @@ import random
 import argparse
 import src.utils as ut
 import multiprocessing
-import time
 from mpi4py import MPI
-from src.models import MLP, CNN, LargeVIT, RESNET, MLPMIXER
+from src.models import MLP, CNN, LargeVIT, RESNET
 from src.vit import VIT
 from src.train_utils import BinarizedDataset
 from src.utils import str2bool, none_or_type
@@ -44,9 +43,9 @@ def get_args():
         Dictionary containing the run config.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default="MLP", choices=["MLP", "RESMLP", "CNN", "VIT", "LargeVIT", "RESNET", "MLPMIXER"], help="Model to use.")
-    parser.add_argument('--max_depth', type=none_or_type(int), default=100, help="Number MLP hidden layers, i.e. depth of the network.")
-    parser.add_argument('--width', type=none_or_type(int), default=1000, help="Number MLP neurons per layer, i.e. width.")
+    parser.add_argument('--model', type=str, default="MLP", choices=["MLP", "RESMLP", "CNN", "VIT", "LargeVIT", "RESNET"], help="Model to use.")
+    parser.add_argument('--max_depth', type=none_or_type(int), default=10, help="Number MLP hidden layers, i.e. depth of the network.")
+    parser.add_argument('--width', type=none_or_type(int), default=100, help="Number MLP neurons per layer, i.e. width.")
     parser.add_argument('--act_func', type=none_or_type(str), default="ReLU",  help="Activation function.")
     parser.add_argument('--act_func2', type=none_or_type(str), default="Linear",  help="Activation function.")
     parser.add_argument('--Vw_max', type=float, default=2.0)
@@ -73,6 +72,7 @@ def process(args):
     Returns a tensor containing global and per-class summaries of the samplewise
     gradient norms recorded across registered layers.
     """
+
     # get args 
     Vb, Vw, cfg = args
     width = cfg["width"]
@@ -80,8 +80,8 @@ def process(args):
     act_func = cfg["act_func"]
     act_func2 = cfg["act_func2"]
    
-    start_dim = -1
     # define flatten
+    start_dim = -1
     if cfg["model"] in ["MLP", "RESMLP"]:
         start_dim = 0 # flatten the whole tensor
 
@@ -135,7 +135,6 @@ def process(args):
         input_size = in_channels * fig_size**2
         n_classes = 100
         dataloader = DataLoader(dataset, batch_size=cfg["batch_size"], shuffle=True)
-        # Normalize(mean, std)
 
     elif cfg["data"] == "tinyimagenet":
         mean=[0.485, 0.456, 0.406]
@@ -154,7 +153,7 @@ def process(args):
     else:
         act = None
     
-    ### second activation function
+    # second activation function
     if act_func2 is not None and not "Linear":
         act2 = getattr(nn, act_func2)(kernel_size=2, stride=2)
     else:
@@ -201,8 +200,6 @@ def process(args):
         model = LargeVIT(sigma_w=np.sqrt(Vw), sigma_b=np.sqrt(Vb), n_classes=n_classes, init=cfg["init"], save_hooks=True, train=False)
     elif cfg["model"] == "RESNET":
         model = RESNET(sigma_w=np.sqrt(Vw), sigma_b=np.sqrt(Vb), n_classes=n_classes, init=cfg["init"], save_hooks=True, train=False)
-    elif cfg["model"] == "MLPMIXER":
-        model = MLPMIXER(sigma_w=np.sqrt(Vw), sigma_b=np.sqrt(Vb), n_classes=n_classes, init=cfg["init"], save_hooks=True, train=False)
     else:
         raise ValueError(f"Model {cfg['model']} not implemented.")
 
@@ -210,19 +207,15 @@ def process(args):
     if cfg["debug_mode"]:
         for nl in range(model.registered_layers):
             print(nl+1, model.registered_names[nl])
-        exit()
-        # print(model)
-        # print("Device", model.device)
-        # #run training step
-        # num_params = sum(p.numel() for p in model.parameters())
-        # print(f"Total parameters: {num_params}")
+        
 
 
     n_data_processed = 0
     grads = []
-    #igb_metric = []
-    #c_metric = []
     out_label = []
+    c_metric = []
+    igb_metric = []
+
     assert cfg["n_data_samples"] >= cfg["batch_size"] and cfg["n_data_samples"] % cfg["batch_size"]==0 # sanity check
     for nb, batch in tqdm.tqdm(enumerate(dataloader)):
         x, y = batch
@@ -234,35 +227,37 @@ def process(args):
             out_label.append(y)
             loss = model.training_step(batch, nb)
             loss.backward()
-            #model.validation_step(batch, nb)
-    
+            model.validation_step(batch, nb)
+
+            effective_depth = len(model.batch_grad_storage.items())
             # retrieve grads, correlation and IGB measures per batch
-            grads_batch = np.zeros([len(model.batch_grad_storage.items()), cfg["batch_size"]], dtype=dtype)
-            #c_batch = np.zeros([len(model.batch_preact_storage), cfg["batch_size"] * (cfg["batch_size"]-1)//2, 1], dtype=dtype)
-            #igb_batch = np.zeros([len(model.batch_preact_storage), 2, 1], dtype=dtype)
+            grads_batch = np.zeros([effective_depth, cfg["batch_size"]], dtype=dtype)
+            c_batch = np.zeros([effective_depth, cfg["batch_size"]*(cfg["batch_size"]-1)//2, 1], dtype=dtype) # store upper triangular correlation coefficients
+            igb_batch = np.zeros([effective_depth, 2, 1], dtype=dtype) # store IGB measures (mean_var_y and var_mu_y)
+
             # retrieve grads and pre-activations
             for nl, (layer_name, grads_l) in enumerate(reversed(model.batch_grad_storage.items())):
-                #pa = model.batch_preact_storage[layer_name].cpu().numpy() # shape (batch_size, width)
-                # correlation coefficient
-                #c = np.corrcoef(pa)
-                #c = np.triu(c, k=1).flatten()
-                #c = c[c!=0]
-                #c_batch[nl, :, 0] = c
-                # gradients
+                # retrieve pre-activations
+                pa = model.batch_preact_storage[layer_name].cpu().numpy() # shape (batch_size, width)
+                #correlation coefficient
+                c = np.corrcoef(pa)
+                c = np.triu(c, k=1).flatten()
+                c = c[c!=0]
+                c_batch[nl, :, 0] = c
+                #gradients
                 grads_batch[nl, :] = grads_l.cpu().numpy() * x.shape[0]**2
                 # IGB measures
-                # compute V and Vtilde
-                #mean_var_y = np.mean(np.var(pa, axis=0)) # variance of pre-activation w.r.t dataset
-                #mu_y = np.mean(pa, axis=0)
-                #var_mu_y = np.var(mu_y) 
-                #igb_batch[nl, 0, 0] = mean_var_y
-                #igb_batch[nl, 1, 0] = var_mu_y
+                mean_var_y = np.mean(np.var(pa, axis=0)) # variance of pre-activation w.r.t dataset
+                mu_y = np.mean(pa, axis=0)
+                var_mu_y = np.var(mu_y) 
+                igb_batch[nl, 0, 0] = mean_var_y
+                igb_batch[nl, 1, 0] = var_mu_y
                 
                
-            # appendd
+            # append
             grads.append(grads_batch)
-            #c_metric.append(c_batch)
-            #igb_metric.append(igb_batch)
+            c_metric.append(c_batch)
+            igb_metric.append(igb_batch)
     
  
     torch.cuda.empty_cache()
@@ -274,17 +269,18 @@ def process(args):
     # stack
     grads = np.concatenate(grads, axis=1)
     out_label = np.concatenate(out_label)
-    #igb_metric = np.concatenate(igb_metric, axis=2)  # shape (n_layers, 2, n_batches)
-    #c_metric = np.concatenate(c_metric, axis=1)  # shape (n_layers, n_pairs, n_batches)
-    #mean_igb_batch = np.mean(igb_metric, axis=2)  
-    #mean_c_batch = np.mean(c_metric, axis=2)
+    igb_metric = np.concatenate(igb_metric, axis=2)  # shape (n_layers, 2, n_batches)
+    c_metric = np.concatenate(c_metric, axis=1)  # shape (n_layers, n_pairs, n_batches)
+    mean_igb_batch = np.mean(igb_metric, axis=2)  
+    mean_c_batch = np.mean(c_metric, axis=2)
    
-    # remove last layer
-    grads = grads[:-1,:] 
-    #mean_igb_batch =  mean_igb_batch[:-1, :] 
-    #mean_c_batch =  mean_c_batch[:-1,:]
+   
+    # create buffer to store quantiles and means of gradients, IGB measures and correlation coefficients.
+    # The buffer has shape (14, n_classes+1, effective_depth), where the first dimension corresponds to the 5 quantiles and mean of gradients, 
+    # 2 IGB measures, 5 quantiles and mean of correlation coefficients, and the second dimension corresponds to global (index 0) and per-class summaries.
     
-    buf = np.zeros((14, n_classes+1, len(model.batch_grad_storage.items())-1), dtype=dtype) 
+    #  The buffer is initialized with NaNs and filled with computed statistics. 
+    buf = np.zeros((14, n_classes+1, len(model.batch_grad_storage.items())), dtype=dtype) 
     buf[:] = np.nan
 
     ### Gradients 
@@ -296,19 +292,18 @@ def process(args):
     buf[5,0,:] =  np.mean(grads, axis=1, keepdims=False) # mean
 
     # IGB metrics
-    #buf[6,0,:] = mean_igb_batch[:,0]  # mean_var_y 
-    #buf[7,0,:] = mean_igb_batch[:,1]  # var_mu_y
+    buf[6,0,:] = mean_igb_batch[:,0]  # mean_var_y 
+    buf[7,0,:] = mean_igb_batch[:,1]  # var_mu_y
 
-    # corr coefficients statistics
-        ### Gradients 
-    #buf[8,0,:] = np.quantile(mean_c_batch, 0.05, axis=1, keepdims=False) # 5 % quantile
-    #buf[9,0,:] = np.quantile(mean_c_batch, 0.25, axis=1, keepdims=False) # 25 % quantile
-    #buf[10,0,:] = np.quantile(mean_c_batch, 0.5, axis=1, keepdims=False) # median
-    #buf[11,0,:] = np.quantile(mean_c_batch, 0.75, axis=1, keepdims=False) # 75% quantile
-    #buf[12,0,:] =  np.quantile(mean_c_batch, 0.95, axis=1, keepdims=False) # 95 % quantile
-    #buf[13,0,:] =  np.mean(mean_c_batch, axis=1, keepdims=False) # mean
+    # Corr coefficients statistics
+    buf[8,0,:] = np.quantile(mean_c_batch, 0.05, axis=1, keepdims=False) # 5 % quantile
+    buf[9,0,:] = np.quantile(mean_c_batch, 0.25, axis=1, keepdims=False) # 25 % quantile
+    buf[10,0,:] = np.quantile(mean_c_batch, 0.5, axis=1, keepdims=False) # median
+    buf[11,0,:] = np.quantile(mean_c_batch, 0.75, axis=1, keepdims=False) # 75% quantile
+    buf[12,0,:] =  np.quantile(mean_c_batch, 0.95, axis=1, keepdims=False) # 95 % quantile
+    buf[13,0,:] =  np.mean(mean_c_batch, axis=1, keepdims=False) # mean
 
-    # per-class
+    # Store only gradients per-class
     for ind, c in enumerate(sort_classes):
         mask = out_label==c
         if mask.any() != False:
@@ -349,6 +344,7 @@ Vw_min, Vw_max = cfg["Vw_min"], cfg["Vw_max"]
 Vb_min, Vb_max = cfg["Vb_min"], cfg["Vb_max"]
 Vw_vec = np.linspace(Vw_min,Vw_max, n_w)
 Vb_vec = np.linspace(Vb_min,Vb_max,n_b)
+
 # select effective depth of the transfoormer
 effective_depth = max_depth
 if cfg["model"] == "VIT":
@@ -363,11 +359,11 @@ seed = cfg["seed"] + 1000*my_rank
 torch.cuda.manual_seed(seed)
 torch.manual_seed(seed)
 np.random.seed(seed)
-#seed = int(np.random.uniform(low=0, high=1e2)) * my_rank +1
 random.seed(seed)
 np.random.seed(seed)
 
 ### SEQUENTIAL MODE HANDLING ###
+# use with limited memory or when mpirun is not available. In this case, we run all computations sequentially on the same CPU and save the results at the end.
 if my_size == 1:
     print("Running in SEQUENTIAL mode (no mpirun detected).")
     all_results = np.zeros((14, n_classes+1, 1, n_b, n_w), dtype=dtype)
@@ -381,68 +377,53 @@ if my_size == 1:
                 all_results =  np.repeat(all_results, effective_depth, axis=2) 
             all_results[:, :, :, id_vb, id_vw] = buf
 
-    if act_func2 == "Linear":
-        ut.save_data(all_results, f"data/init/{cfg['model']}_{cfg['data']}_{act_func}_D{cfg['max_depth']}_W{cfg['width']}.h5", cfg)
-    else:
-        ut.save_data(all_results, f"data/init/{cfg['model']}_{cfg['data']}_{act_func}+{act_func2}_D{cfg['max_depth']}_W{cfg['width']}.h5",cfg)
-    exit(0)  # End program after sequential run
+    # save
+    ut.save_data(all_results, f"results_init/{cfg['model']}_{cfg['data']}_{act_func}+{act_func2}_D{cfg['max_depth']}_W{cfg['width']}.h5",cfg)
+
+    exit()  # End program after sequential run
 
 
-# ### MPI CODE HANDLING ###
+### MPI CODE HANDLING ###
+# use with mpirun, each process computes a single (Vb, Vw) pair and sends the result to the rank 0 process for aggregation and saving. This allows to run on multiple CPUs or machines in parallel.
 
-# # check number of cpus
-# if my_size < n_b * n_w :
-#     raise ValueError(f"Number of MPI processes ({multiprocessing.cpu_count()}) is too low. At least {n_b * n_w } necessary")
+# check number of cpus
+if my_size != n_b * n_w :
+    raise ValueError(f"Number of MPI processes ({my_size}) should be {n_b * n_w }.")
 
 
-# # get ids corresponding to the rank
-# id_vb = my_colour%n_b
-# id_vw = (my_colour - id_vb)//n_b
-# Vb = Vb_vec[id_vb]
-# Vw = Vw_vec[id_vw]
 
-# print(f"Hello from rank {my_rank}, colour {my_colour} with sub-rank {my_sub_rank} on {MPI.Get_processor_name()} with seed {seed}! I am computing Vb={Vb}, Vw={Vw} and width = {width}")
+# get ids corresponding to the rank
+id_vb = my_rank%n_b
+id_vw = (my_rank - id_vb)//n_b
+Vb = Vb_vec[id_vb]
+Vw = Vw_vec[id_vw]
 
-# # run computation
-# buf = process((Vb, Vw, cfg)) # buf.shape = (8,  n_classes, max_depth)
-# effective_depth = buf.shape[2]
+# sanity message
+print(f"Hello from rank {my_rank},  on {MPI.Get_processor_name()} with seed {seed}! I am computing Vb={Vb}, Vw={Vw} and width = {width}")
 
-# if my_colour == 0:
-#     # compute local sums
-#     local_sum = np.sum(buf, axis=(-1), keepdims=False)
-#     global_sum = np.zeros((8,  n_classes+1, effective_depth), dtype=dtype)
-#     sub_comm.Reduce(local_sum, (global_sum, 8*(n_classes+1)*effective_depth, MPI.FLOAT), op=MPI.SUM, root=0)
-    
-#     # aggregation of the result for each sub communicator
-#     if my_sub_rank==0: # colour 0 process 0 (i.e. global 0)
-#         # save 0th buffer
-#         save_buf = np.zeros((8,  n_classes+1, effective_depth, n_b,n_w), dtype=dtype)
-#         save_buf[:,:,:,0, 0] =  global_sum / (n_net_samples) 
-#         # save receive other buffers
-#         for sub_colour in range(1,n_b * n_w):
-#             id_vb = sub_colour%n_b
-#             id_vw = (sub_colour - id_vb)//n_b
-#             rcv_buf = np.zeros((8,  n_classes+1, effective_depth), dtype=dtype)
-#             comm.Recv([rcv_buf, 8*(n_classes+1)*effective_depth,MPI.FLOAT], source=sub_colour, tag=sub_colour) 
-#             save_buf[:, :, :, id_vb, id_vw] = rcv_buf
+# run computation
+buf = process((Vb, Vw, cfg)) # buf.shape = (14,  n_classes + 1, effective_depth)
 
-#         # save data
-#         if act_func2=="Linear":
-#             ut.save_data(save_buf, f"data/init/{cfg['model']}_{cfg['data']}_{act_func}_D{cfg['max_depth']}_W{cfg['width']}.h5", cfg)
-#         else:
-#             ut.save_data(save_buf, f"data/init/{cfg['model']}_{cfg['data']}_{act_func}+{act_func2}_D{cfg['max_depth']}_W{cfg['width']}.h5", cfg)
+if my_rank == 0:
+    effective_depth = buf.shape[2]
+    # save 0th buffer
+    save_buf = np.zeros((14,  n_classes+1, effective_depth, n_b,n_w), dtype=dtype)
+    save_buf[:,:,:,0, 0] =  buf
 
-# elif my_colour >0 and my_colour < n_b*n_w:
-#     # compute local sums
-#     local_sum = np.sum(buf, axis=(-1), keepdims=False)
-#     # aggregate
-#     global_sum = np.zeros((8,  n_classes+1, effective_depth), dtype=dtype)
-#     sub_comm.Reduce(local_sum, global_sum, op=MPI.SUM, root=0)
-#     global_mean = global_sum / (n_net_samples) 
+    # save receive other buffers
+    for sub_rank in range(1,n_b * n_w):
+        id_vb = sub_rank%n_b
+        id_vw = (sub_rank - id_vb)//n_b
+        rcv_buf = np.zeros((14,  n_classes+1, effective_depth), dtype=dtype)
+        comm.Recv([rcv_buf, 14*(n_classes+1)*effective_depth,MPI.FLOAT], source=sub_rank, tag=sub_rank) 
+        save_buf[:, :, :, id_vb, id_vw] = rcv_buf
 
-#     # aggregation of the result for each sub communicator
-#     if my_sub_rank==0:
-#         comm.Send([global_mean,8*(n_classes+1)*effective_depth,MPI.FLOAT], dest=0, tag=my_colour)
+        # save data
+        ut.save_data(save_buf, f"results_init/{cfg['model']}_{cfg['data']}_{act_func}+{act_func2}_D{cfg['max_depth']}_W{cfg['width']}.h5", cfg)
 
-# else:
-#     print(f"Hello from rank {my_rank}, colour {my_colour} with sub-rank {my_sub_rank} on {MPI.Get_processor_name()} with seed {seed}. I should not even exist.")
+elif my_rank > 0 and my_rank < n_b*n_w:
+    # send results to rank 0
+    comm.Send([buf,14*(n_classes+1)*effective_depth,MPI.FLOAT], dest=0, tag=my_rank)
+
+else:
+    print(f"Hello from rank {my_rank} on {MPI.Get_processor_name()} with seed {seed}. I should not even exist.")

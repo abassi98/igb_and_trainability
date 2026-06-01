@@ -165,14 +165,11 @@ class SuperModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         """Run one training step and update classwise training metrics."""
         x, y = batch
-        #print("x, y shape", x.shape, y.shape)
         self.batch_size = x.shape[0]
         self.current_batch_y = y
         y_hat = self(x)
-        #print("y_hat", y_hat.shape, y_hat)
         losses = self.loss_fn(y_hat, y)  # Classification-friendly
         loss = torch.mean(losses)
-
         self.train_acc_per_class.update(y_hat, y)  # compute accuracy per-class
         self.train_freq_per_class.update(y_hat)  # update frequency per-class
         self.train_loss_per_class.update(losses, y)  # update losses per-class
@@ -467,8 +464,6 @@ class LargeVIT(SuperModule):
         return x
     
 
-
-
 # pretrained large VIT
 class RESNET(SuperModule):
     """Wrapper around a timm ResNet-18 backbone."""
@@ -502,9 +497,7 @@ class RESNET(SuperModule):
             # initialize
             if self.init=="Gaussian":
                 self._init_gaussian()
-            elif self.init=="Orthogonal":
-                self._init_orthogonal()
-
+           
        
         if save_hooks: # do not save during training
             # save forward/backward hooks
@@ -521,49 +514,4 @@ class RESNET(SuperModule):
     
 
 
-# pretrained large VIT
-class MLPMIXER(SuperModule):
-    """Wrapper around a timm MLP-Mixer backbone."""
-    def __init__(self, 
-                sigma_w=1.0,
-                sigma_b=0.0,
-                lr = 0.001,
-                n_classes = 200,
-                save_hooks=False,
-                weight_decay=0.0,
-                init=None,
-                train=False):
-        super(MLPMIXER, self).__init__(sigma_w, sigma_b, lr, n_classes, weight_decay)
-        self.init = init
-
-        if self.init == None:
-            self.model = create_model('mixer_l16_224.goog_in21k', pretrained=True, drop_path_rate=0.0)
-            # for name, module in self.named_modules():
-            #     if isinstance(module, nn.Linear) or isinstance(module, nn.Conv2d):
-            #         module.weight.data = module.weight.data * self.sigma_w
-            #         #pass
-            if train:
-                for param in self.model.parameters(): 
-                    param.requires_grad = False # froze model for fine tuning if train mode
-                #param = param * sigma_w      
-        else:
-            self.model = create_model('mixer_l16_224.goog_in21k', pretrained=False, drop_path_rate=0.0)
-            self.non_linearities = ["Linear"] *10000 # to be modified
-            # initialize
-            if self.init=="Gaussian":
-                self._init_gaussian()
-            elif self.init=="Orthogonal":
-                self._init_orthogonal()
-
-       
-        if save_hooks: # do not save during training
-            # save forward/backward hooks
-            self.save_forward_hook()
-            self.save_backward_hook()
-
-        in_features = self.model.get_classifier().in_features
-        self.model.head = nn.Linear(in_features, self.n_classes)
-        
-    def forward(self, x):
-        x = self.model(x)
-        return x
+  
