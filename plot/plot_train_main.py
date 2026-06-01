@@ -191,7 +191,6 @@ if __name__ == "__main__":
     # plot
     for n_spec, specific in enumerate(specific_counter.keys()):
         # set up figures
-        # set up figures
         fig_acc, ax_acc = plt.subplots(2, 2, figsize=(10, 2.5), sharey="row", sharex=True)
         nruns = specific_counter[specific]
         model = specific.split('_')[0]
@@ -212,24 +211,20 @@ if __name__ == "__main__":
         for run in range(1,nruns+1):
             name = f"{specific}_run{run}.cfg"
             Vw = Vw_specific[name]*calculate_gain(act_func, "Linear", 0.1)
-            #color = cmap(norm(Vw))
             phase = get_phase(act_func, run)
             
             name = phase.replace("_", " ")
             label = f"{name.title()} ($\\sigma_w^2$ = {np.round(Vw,2)})"
             color = dict_phase_color[phase]
             metrics = metrics_dict[f"{specific}_run{run}.cfg"]
-            #print(metrics.columns)
-            #print(metrics.xs(0, level=1)["test_acc_class_0"])
-            #print(metrics)
-            #print(name, metrics.xs(0, level=1)["test_acc_class_0"])
+            #
+           
             Vw = Vw_dict[f"{specific}_run{run}.cfg"]
             # retrieve stats and take stats over the version
             mean = metrics.groupby(level=1).mean()
             std = metrics.groupby(level=1).std()
             q05 = metrics.groupby(level=1).quantile(0.25)    
             median = metrics.groupby(level=1).quantile(0.5)
-            #print(name, median.iloc[:2]["test_acc_class_0"])
             q95 = metrics.groupby(level=1).quantile(0.75)
             max = metrics.groupby(level=1).max()
             min = metrics.groupby(level=1).min()

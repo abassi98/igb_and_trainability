@@ -1,4 +1,4 @@
-"""MPI computation of depth-induced prejudice recursion statistics.
+"""MPI computation of deep information propagation (Schoenholz et al., 2016) recursion statistics.
 
 The script numerically iterates variance and covariance recursions over depth for
 selected activations and stores the resulting trajectories in HDF5 format. These
@@ -33,7 +33,7 @@ def get_args():
     parser.add_argument('--Vw_min', type=float, default=1.0)
     parser.add_argument('--Vb_max', type=float, default=0.2)
     parser.add_argument('--Vb_min', type=float, default=0.0)
-    parser.add_argument('--n_w', type=int, default=1)
+    parser.add_argument('--n_w', type=int, default=3)
     parser.add_argument('--n_b', type=int, default=1)
     parser.add_argument('--n_samples', type=int, default=4)
     parser.add_argument('--seed', type=int, default=42)
@@ -86,6 +86,7 @@ def update_covariance_2nodes_mc(cab, qaa, qbb, Vw, Vb, act_func, act_func2, N=10
     I = np.mean(values)
     return Vw * I + Vb
 
+# define some two-point activation functions
 class Linear:
     """Identity two-input operator used as a baseline in the recursion code."""
     def __init__(self):
@@ -107,6 +108,7 @@ class AveragePool:
     def __call__(self, x, y):
         return (x+y)/2
 
+# define processing function for one (Vb, Vw) pair
 def process(args):
     """Compute DIP trajectories for one ``(Vb, Vw)`` pair."""
     # get args 
@@ -115,7 +117,6 @@ def process(args):
     act_func = getattr(ut,cfg["act_func"])()
     act_func2 = globals()[cfg["act_func2"]]()    
     n_samples = cfg["n_samples"]
-    width = 10000
     
     qaa_init = np.random.uniform(0.98, 1.2, size=(n_samples,))
     qbb_init =   np.random.uniform(0.98, 1.2, size=(n_samples,))
@@ -176,19 +177,22 @@ random.seed(seed)
 np.random.seed(seed)
 
 # check number of cpus
-if my_size < n_b * n_w:
-    raise ValueError(f"Number of MPI processes ({multiprocessing.cpu_count()}) is too low. At least {n_b * n_w} necessary")
+if my_size != n_b * n_w :
+    raise ValueError(f"Number of MPI processes ({my_size}) should be {n_b * n_w }.")
+
+# get ids corresponding to the rank
+id_vb = my_rank%n_b
+id_vw = (my_rank - id_vb)//n_b
+Vb = Vb_vec[id_vb]
+Vw = Vw_vec[id_vw]
+
+# sanity message
+print(f"Hello from rank {my_rank} on {MPI.Get_processor_name()} with seed {seed}. I am computing Vb={Vb}, Vw={Vw}")
+
+# run computation
+buf = process((Vb, Vw, cfg)) # buf.shape = (2, max_depth, width, n_net_samples_per_process)
 
 if my_rank == 0:
-    # get ids corresponding to the rank
-    id_vb = my_rank%n_b
-    id_vw = (my_rank - id_vb)//n_b
-    Vb = Vb_vec[id_vb]
-    Vw = Vw_vec[id_vw]
-    
-    print(f"Hello from rank {my_rank} on {MPI.Get_processor_name()} with seed {seed}. I am computing Vb={Vb}, Vw={Vw}")
-    # run computation
-    buf = process((Vb, Vw, cfg)) # buf.shape = (2, max_depth, width, n_net_samples_per_process)
     # save 0th buffer
     save_buf = np.zeros((3, max_depth, n_samples, n_b,n_w), dtype=dtype)
     save_buf[:,:,:, 0, 0] =  buf
@@ -201,24 +205,9 @@ if my_rank == 0:
         save_buf[:,:,:,id_vb, id_vw] = rcv_buf
 
     # save data
-    if act_func2=="Linear":
-        ut.save_data(save_buf, f"data/{act_func}_D{cfg['max_depth']}_DIP.h5", cfg)
-    else:
-        ut.save_data(save_buf, f"data/{act_func}+{act_func2}_D{cfg['max_depth']}_DIP.h5", cfg)
+    ut.save_data(save_buf, f"results_init/dip_{act_func}+{act_func2}_D{cfg['max_depth']}.h5", cfg)
 
-elif my_rank > 0 and my_rank < n_b*n_w:
-    # get ids corresponding to the rank
-    id_vb = my_rank%n_b
-    id_vw = (my_rank - id_vb)//n_b
-    Vb = Vb_vec[id_vb]
-    Vw = Vw_vec[id_vw]
-    print(f"Hello from rank {my_rank} on {MPI.Get_processor_name()} with seed {seed}. I am computing Vb={Vb}, Vw={Vw}.")
-
-    # run computation
-    buf = process((Vb, Vw, cfg)) # buf.shape = (3, max_depth, n_samples, n_net_samples_per_process)
-   
+else:
     # send results to 0
     comm.Send([buf,3*max_depth*n_samples, MPI.FLOAT], dest=0, tag=my_rank)
 
-else:
-    print(f"Hello from rank {my_rank} on {MPI.Get_processor_name()} with seed {seed}. I should not even exist.")

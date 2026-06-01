@@ -1,3 +1,10 @@
+"""
+Compute the EOC for Tanh and Tanh+AveragePool, as a function of the variance of the bias.
+The EOC is computed as the limit of the variance of the pre-activations at layer l, as l goes to infinity. 
+The EOC is computed by iterating the variance update equation until convergence, and then computing the derivative of the variance update equation at the fixed point. The results are saved in a csv file.
+"""
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 import autograd.numpy as np
@@ -6,7 +13,9 @@ from autograd import grad
 import src.utils as ut
 from scipy.special import erf
 import pandas as pd
+from tqdm import tqdm
 
+# select intervals, refering to the variance of weights and biases
 Vb_min = 0.0
 Vb_max = 0.2
 Vw_min = 0.0
@@ -120,29 +129,31 @@ def averagepool(x, y):
     return (x+y)/2
 
 
-### Tanh and Tanh+MaxPool
-#draw edge of chaos
-# eoc = []
-# for sigma_b_squared in x:
-#     q=1.0
-#     n_iter = 1000
-#     for ii in range(n_iter):
-#         q = eoc_variance_tanh(q, sigma_b_squared)
-#     eoc.append(eoc_der_tanh(q))
+### Tanh 
+eoc = []
+pbar = tqdm(total=len(x), desc="Computing EOC for Tanh")
+for sigma_b_squared in x:
+    q=1.0
+    n_iter = 1000
+    for ii in range(n_iter):
+        q = eoc_variance_tanh(q, sigma_b_squared)
+    eoc.append(eoc_der_tanh(q))
+    pbar.update(1)
 
-# df = pd.DataFrame(data={"Vb":x, "eoc":eoc})
-# df.to_csv("data/eoc_tanh.txt")
+df = pd.DataFrame(data={"Vb":x, "eoc":eoc})
+df.to_csv("data/eoc_Tanh+Linear.csv")
+df.to_csv("data/eoc_Tanh+MaxPool.csv")
 
 ### Tanh+AveragePool
-
-#draw edge of chaos
 eoc = []
+pbar = tqdm(total=len(x), desc="Computing EOC for Tanh+AveragePool")
 for sigma_b_squared in x:
     q=1.0
     n_iter = 1000
     for ii in range(n_iter):
         q = eoc_variance_tanhaveragepool(q, sigma_b_squared)
     eoc.append(eoc_der_tanhaveragepool(q))
+    pbar.update(1)
 
 df = pd.DataFrame(data={"Vb":x, "eoc":eoc})
-df.to_csv("data/eoc_tanh_averagepool.csv")
+df.to_csv("data/eoc_Tanh+AveragePool.csv")

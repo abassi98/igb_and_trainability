@@ -69,10 +69,7 @@ if __name__=="__main__":
         inset.set_ylabel("$|c - c_{ab}^{(l)}|$", fontsize=15, rotation=90)
         
         # load experimental values (IGB) for comparison
-        if act_func2 == "Linear":
-            run_cfg, buf = ut.read_data(f"data/{act_func}_D{max_depth}_W{width}.h5")
-        else:
-            run_cfg, buf = ut.read_data(f"data/{act_func}+{act_func2}_D{max_depth}_W{width}.h5")
+        run_cfg, buf = ut.read_data(f"results_init/{act_func}+{act_func2}_D{max_depth}_W{width}.h5")
         n_w, n_b, Vw_range, Vb_range = run_cfg["n_w"], run_cfg["n_b"], [run_cfg["Vw_min"], run_cfg["Vw_max"]], [run_cfg["Vb_min"], run_cfg["Vb_max"]]
   
         Vexp = buf[0,:, 0, :, :]
@@ -83,18 +80,11 @@ if __name__=="__main__":
         Cigb = Gexp/(Gexp+1) # c from IGB
 
         # load theoretical values (DIP)
-        if act_func2=="Linear":
-            run_cfg2, buf2 = ut.read_data(f"data/{act_func}_D200_DIP.h5")
-            qaa = buf2[0,...]
-            qbb = buf2[1,...]
-            qab = buf2[2,...]
-            c_star = np.mean(qab/np.sqrt(qaa*qbb), axis=1)[-1,...]
-        else:
-            run_cfg2, buf2 = ut.read_data(f"data/{act_func}+{act_func2}_D200_DIP.h5")
-            qaa = buf2[0,...]
-            qbb = buf2[1,...]
-            qab = buf2[2,...]
-            c_star = np.mean(qab/np.sqrt(qaa*qbb), axis=1)[-1,...]
+        run_cfg2, buf2 = ut.read_data(f"results_init/dip_{act_func}+{act_func2}_D200_DIP.h5")
+        qaa = buf2[0,...]
+        qbb = buf2[1,...]
+        qab = buf2[2,...]
+        c_star = np.mean(qab/np.sqrt(qaa*qbb), axis=1)[-1,...]
        
         n_w, n_b = run_cfg["n_w"], run_cfg["n_b"]
         Vw_max, Vw_min = run_cfg["Vw_max"], run_cfg["Vw_min"]
@@ -182,9 +172,6 @@ if __name__=="__main__":
         sm.set_array([])  # Not used, but required for colorbar
         cb = fig.colorbar(sm, cax=cax)
         cb.ax.set_title("$\sigma_w^2$", fontsize=12)
-        #cb.set_label(f"{cmap_igb} scale")        # customize the label
-        #cb.set_ticks(np.linspace(vlim[0], vlim[1], 5))  # explicit tick locations
-
         # save main figure
         handles, labels = ax.get_legend_handles_labels()
         

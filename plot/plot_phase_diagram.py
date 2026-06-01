@@ -42,38 +42,6 @@ for ii in range(2):
     ax[ii].set_ylim(Vw_min, Vw_max)
 
 
-### draw Linear phase diagram
-# ax[0].set_title("Linear", fontsize=20)
-# # divergent chaos
-# ax[0].fill_between(x, 1, Vw_max, color=dict_phase_color["divergent_chaos"])
-# ax[0].annotate("Divergent Chaos", 
-#             xy=(0.0, 2.5),                 # Point to annotate
-#             xytext=(0.1, 2.),
-#             color="white",  fontsize=15)     # Text position
-#             #arrowprops=dict(facecolor='white', arrowstyle='->'))
-
-# # finite order
-# ax[0].fill_between(x, 0, 1.0, color=dict_phase_color["finite_order"])
-# ax[0].annotate("Finite order", 
-#             xy=(0.0, 2.5),                 # Point to annotate
-#             xytext=(0.3, 0.65),
-#             color="white", fontsize=15)     # Text position
-# # edge of chaos
-# ax[0].scatter(0.0, 1.0, color=dict_phase_color["edge_of_chaos"], marker="o", s=100, clip_on=False, zorder=5)
-
-# # order/chaos phase transition
-# ax[0].axhline(y=1.0, xmin=0, xmax=1, lw=3, ls="--", color=dict_phase_color["edge_of_chaos"])
-
-# # vanishig chaos
-# ax[0].axvline(x=0.0, ymin=0.0, ymax=1.0/Vw_max, color=dict_phase_color["vanishing_chaos"], lw=3,zorder=3, clip_on=False)
-# ax[0].annotate("Vanishing chaos", 
-#             xy=(0.0, 2.5),                 # Point to annotate
-#             xytext=(0.02, 0.4),
-#             color=dict_phase_color["vanishing_chaos"], fontsize=15)     # Text position
-#             #arrowprops=dict(facecolor='white', arrowstyle='->'))
-
-
-
 ### draw ReLU phase diagram
 ax[0].set_title("ReLU", fontsize=20)
 ax[0].set_xticks([0, 0.05, 0.1, 0.15, 0.2])
@@ -98,14 +66,7 @@ ax[0].scatter(0.0, 2.0, color=dict_phase_color["edge_of_chaos"], marker="o", s=1
 # order/chaos phase transition
 ax[0].axhline(y=2.0, xmin=0, xmax=1, lw=3, ls="--", color=dict_phase_color["edge_of_chaos"])
 
-# # vanishig order
-# ax[0].axvline(x=0.0, ymin=0.0, ymax=2.0/Vw_max, color=dict_phase_color["vanishing_order"], lw=5,zorder=3, clip_on=False)
-# ax[0].annotate("Vanishing order", 
-#             xy=(0.0, 2.5),                 # Point to annotate
-#             xytext=(0.02, 0.8),
-#             color=dict_phase_color["vanishing_order"], fontsize=15)     # Text position
-#             #arrowprops=dict(facecolor='white', arrowstyle='->'))
-    
+
 ### draw Tanh phase diagram
 ax[1].set_title("Tanh", fontsize=20)
 
@@ -142,13 +103,6 @@ ax[1].annotate("Ordered-deep prejudice",
             color="white", fontsize=18)     # Text position
             #arrowprops=dict(facecolor='white', arrowstyle='->'))
 
-# # vanishig chaos
-# ax[1].axvline(x=0.0, ymin=0.0, ymax=1.0/Vw_max, color=dict_phase_color["vanishing_chaos"], lw=3,zorder=3, clip_on=False)
-# ax[1].annotate("Vanishing chaos", 
-#             xy=(0.0, 2.5),                 # Point to annotate
-#             xytext=(0.02, 0.4),
-#             color=dict_phase_color["vanishing_chaos"], fontsize=15)     # Text position
-#             #arrowprops=dict(facecolor='white', arrowstyle='->'))
 
 fig.tight_layout()
 fig.savefig("figures/phase_diagrams.png", dpi=300)
@@ -172,7 +126,7 @@ for ii in range(2):
     ax[0,ii].set_xlim(Vb_min, Vb_max)
     ax[0,ii].set_ylim(Vw_min, Vw_max)
 
-### ReLU +Maxpool
+### ReLU + Maxpool
 Vw_crit= 4*np.pi/(3*np.pi+2)
 ax[0,0].set_title("ReLU+MaxPool", fontsize=20)
 # divergent correlated chaos
@@ -202,14 +156,7 @@ ax[0,0].annotate("$\\frac{4\pi}{3\pi+2}$",
 # order/chaos phase transition
 ax[0,0].axhline(y=Vw_crit, xmin=0, xmax=1, lw=3, ls="--", color=dict_phase_color["edge_of_chaos"])
 
-# # vanishig order
-# ax[0,0].axvline(x=0.0, ymin=0.0, ymax=Vw_crit/Vw_max, color=dict_phase_color["vanishing_order"], lw=5,zorder=3, clip_on=False)
-# ax[0,0].annotate("Vanishing order", 
-#             xy=(0.0, 2.5),                 # Point to annotate
-#             xytext=(0.02, 0.7),
-#             color=dict_phase_color["vanishing_order"], fontsize=15)     # Text position
-#             #arrowprops=dict(facecolor='white', arrowstyle='->'))
-    
+
 
 ax[0,1].set_title("Tanh+MaxPool", fontsize=20)
 eoc = pd.read_csv("data/eoc_Tanh+MaxPool.csv", index_col=0).loc[:,"eoc"]
@@ -232,17 +179,6 @@ ax[0,1].annotate("Ordered-deep prejudice",
             color="white", fontsize=18)     # Text position
             #arrowprops=dict(facecolor='white', arrowstyle='->'))
 
-# # vanishig chaos
-# ax[1,0].axvline(x=0.0, ymin=0.0, ymax=eoc[0]**2/Vw_max, color=dict_phase_color["vanishing_chaos"], lw=3,zorder=3, clip_on=False)
-# ax[1,0].annotate("Vanishing chaos", 
-#             xy=(0.0, 2.5),                 # Point to annotate
-#             xytext=(0.02, 0.4),
-#             color=dict_phase_color["vanishing_chaos"], fontsize=15)     # Text position
-#             #arrowprops=dict(facecolor='white', arrowstyle='->'))
-
-#fig.tight_layout()
-#fig.savefig("figures/phase_diagrams_maxpool.png", dpi=300)
-
 
 
 Vb_min = 0.0
@@ -254,6 +190,7 @@ for ii in range(2):
     ax[1,ii].set_xlim(Vb_min, Vb_max)
     ax[1,ii].set_ylim(Vw_min, Vw_max)
 ax[0,0].set_xticks([0, 0.05, 0.1, 0.15, 0.2])
+
 ### Tanh + Maxpool
 tanh = np.tanh
 def act_func(z1, z2):
@@ -304,17 +241,6 @@ ax[1,0].annotate("$\\frac{4\pi}{\pi+1}$",
             color="white",  fontsize=15,     # Text position
             arrowprops=dict(color="white", arrowstyle='->'))
 
-# # vanishig order
-# ax[0,1].axvline(x=0.0, ymin=0.0, ymax=Vw_crit/Vw_max, color=dict_phase_color["vanishing_order"], lw=5,zorder=3, clip_on=False)
-# ax[0,1].annotate("Vanishing order", 
-#             xy=(0.0, 2.5),                 # Point to annotate
-#             xytext=(0.02, 0.8),
-#             color=dict_phase_color["vanishing_order"], fontsize=15)     # Text position
-#             #arrowprops=dict(facecolor='white', arrowstyle='->'))
-    
-
-
-
 
 ### Tanh + Averagepool
 tanh = np.tanh
@@ -359,13 +285,6 @@ ax[1,1].annotate("Ordered-deep prejudice",
             color="white", fontsize=18)     # Text position
             #arrowprops=dict(facecolor='white', arrowstyle='->'))
 
-# # vanishig chaos
-# ax[1,1].axvline(x=0.0, ymin=0.0, ymax=eoc[0]**2/Vw_max, color=dict_phase_color["vanishing_chaos"], lw=3,zorder=3, clip_on=False)
-# ax[1,1].annotate("Vanishing chaos", 
-#             xy=(0.0, 2.5),                 # Point to annotate
-#             xytext=(0.02, 0.4),
-#             color=dict_phase_color["vanishing_chaos"], fontsize=15)     # Text position
-#             #arrowprops=dict(facecolor='white', arrowstyle='->'))
 
 fig.tight_layout()
 fig.savefig("figures/phase_diagrams_pool.png", dpi=300)

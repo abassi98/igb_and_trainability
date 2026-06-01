@@ -1,4 +1,5 @@
-"""Empirical initialization scan for gradient and class-bias statistics.
+"""
+Empirical initialization scan for gradient and class-bias statistics.
 
 The script evaluates randomly initialized models on real datasets, performs a
 single backward pass over batches, aggregates per-layer gradient statistics, and
@@ -421,9 +422,6 @@ if my_rank == 0:
         # save data
         ut.save_data(save_buf, f"results_init/{cfg['model']}_{cfg['data']}_{act_func}+{act_func2}_D{cfg['max_depth']}_W{cfg['width']}.h5", cfg)
 
-elif my_rank > 0 and my_rank < n_b*n_w:
+else:
     # send results to rank 0
     comm.Send([buf,14*(n_classes+1)*effective_depth,MPI.FLOAT], dest=0, tag=my_rank)
-
-else:
-    print(f"Hello from rank {my_rank} on {MPI.Get_processor_name()} with seed {seed}. I should not even exist.")

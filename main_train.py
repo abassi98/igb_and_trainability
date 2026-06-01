@@ -29,26 +29,6 @@ from src.datasets import TinyImageNetDataset
 from datasets import load_dataset
 
 
-
-def select_init(model, batch, target, eps=1e-1):
-    """Reinitialize a model until its initial class-frequency bias is close to a target.
-
-    The script uses the maximum predicted class frequency on a validation-style
-    pass as a proxy for initialization bias. Reinitialization continues until
-    the distance from the requested target is below ``eps``.
-    """
-    target_dist = np.inf
-    while target_dist > eps:
-        model._init()
-        loss = model.training_step(batch, 0)
-        loss.backward()
-        model.validation_step(batch, 0)
-        model.on_validation_epoch_end() 
-        # compute max classification frequency (proxy for IGB)
-        max_freq = max(model.train_freqs.numpy())
-        target_dist = abs(max_freq - target)
-        print(f"Max class freq: {max_freq}, target: {target}, dist: {target_dist}")
-
 def get_args():
     """Parse input arguments
 
@@ -58,7 +38,7 @@ def get_args():
         Dictionary containing the run config.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('mode', choices=["train", "evaluate"])
+    parser.add_argument('mode', choices=["train"])
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--spec_file', type=str, help="File containing the specification of the model.")
     
@@ -152,9 +132,7 @@ def train(args):
     train_loader = DataLoader(train_dataset, batch_size=cfg["batch_size_train"], shuffle=True, num_workers=2)
     test_loader = DataLoader(test_dataset, batch_size=cfg["batch_size_test"], shuffle=False,num_workers=2)
     
-    # data, _ = next(iter(train_loader))
-    # print(data.shape)
-    # exit()
+   
     # define trainer
     logger = CSVLogger("tb_logs", name=spec_file)
     trainer = Trainer(max_steps=cfg["max_steps"],
@@ -218,11 +196,10 @@ def train(args):
     else:
         raise ValueError(f"Model {cfg['model']} not implemented.")
    
-    
+    # print model device
     print("Device", model.device)
+
     # fit model
-    batch_init = next(iter(train_loader))
-    select_init(model, batch_init, target=cfg["target_max_freq"], eps=0.05)
     trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=test_loader)
     
     
