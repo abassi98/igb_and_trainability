@@ -44,7 +44,7 @@ If you use this repository, please cite the paper (BibTeX below).
 igb_and_trainability/
 │
 ├── src/                         # Core implementation
-├── plot/                        # Figure generation scripts
+├── scripts/                        # Figure generation scripts
 │
 ├── train_spec_mlp_bfmnist/
 ├── train_spec_mlp_cifar10/
@@ -191,17 +191,16 @@ Training logs are stored automatically.
 All figure generation scripts are located under:
 
 ```text
-plot/
+scripts/
 ```
 
 Example commands:
 
 ```bash
-python plot/plot_init.py
-python plot/plot_forward.py
-python plot/plot_dip.py
-python plot/plot_phase_diagram.py
-python plot/plot_train_main.py
+python scripts/plot_init.py
+python scripts/plot_forward.py
+python scripts/plot_dip.py
+python scripts/plot_train_main.py
 ```
 
 Plots are saved locally by the scripts.
@@ -223,3 +222,8 @@ year={2026},
 url={https://openreview.net/forum?id=75ce9hnKne}
 }
 ```
+
+Plot scripts share `src/plot_style.py` and save PDF figures at 300 dpi with tight bounds.
+Run them from the repository root. LaTeX with `fontenc` and `mathpazo` is required
+(`eulervm` is optional). Filled uncertainty bands are rasterized; lines and text remain vectors.
+The legacy `scripts/merge.py` utility reads existing PNG panels and embeds them in a PDF.
